@@ -150,7 +150,8 @@ The evolution demonstrates modern web development practices including:
 ---
 
 **Release Date**: October 31, 2025
-**Lead Developer**: Claude AI Assistant (Anthropic)
+**Lead Developer**: Aryan & Darsh
+**Lead Agent**: Groke-Code-Fast-1 via Cline
 **Architecture**: Django Web Framework
 **Design System**: WhatsApp Dark Mode Theme
 **Citation Practice**: Industry-standard academic/technical references

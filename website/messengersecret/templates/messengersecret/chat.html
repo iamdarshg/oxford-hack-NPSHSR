@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Messenger</title>
+    <title>{% if contact %}{{ contact.username }}{% else %}Contacts{% endif %} - Secret Messenger</title>
     <style>
         * {
             margin: 0;
@@ -385,6 +385,104 @@
             color: #6c757d;
         }
 
+        /* P2P Messenger Layout */
+        .p2p-layout {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .contacts-sidebar {
+            width: 300px;
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            height: fit-content;
+        }
+
+        .contacts-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #e9edef;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 10px;
+        }
+
+        .contact-item {
+            display: block;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #374151;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #e9edef;
+            transition: all 0.2s ease;
+        }
+
+        .contact-item:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+        }
+
+        .contact-item.active {
+            background: #25d366;
+            color: white;
+        }
+
+        .contact-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .contact-hash {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+
+        .no-contacts {
+            text-align: center;
+            color: #8696a0;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        .main-chat {
+            flex: 1;
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .chat-header {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #e9edef;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-to-contacts {
+            background: #25d366;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        .back-to-contacts:hover {
+            background: #128c7e;
+        }
+
         @media (max-width: 768px) {
             .header {
                 padding: 10px 15px;
@@ -395,6 +493,19 @@
             .main-container {
                 margin: 15px auto;
                 padding: 0 10px;
+            }
+
+            .p2p-layout {
+                flex-direction: column;
+            }
+
+            .contacts-sidebar {
+                width: 100%;
+                order: 1;
+            }
+
+            .main-chat {
+                order: 2;
             }
 
             .chat-container {
@@ -434,53 +545,114 @@
         </div>
     </header>
 
-    <div class="main-container">
-        <div class="chat-container">
-            <div class="welcome-message">
-                <div class="greeting">👋 Hello, {{ user.username }}!</div>
-                <div class="subtitle">You're now in the secure chat room</div>
-            </div>
+    <div class="p2p-layout">
+        <!-- Contacts Sidebar -->
+        <div class="contacts-sidebar">
+            <div class="contacts-title">📱 Your Contacts</div>
 
-            <div class="security-notice">
-                <strong>🔒 Security Note:</strong> Message encoding and decoding functions are placeholders.
-                Implement your own security functions in <code>views.py</code> encode_message() and decode_message() functions.
-            </div>
-
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}success{% endif %}">
-                        {{ message }}
-                    </div>
+            {% if contacts %}
+                {% for contact in contacts %}
+                    <a href="{% url 'chat_with_user' contact.username %}"
+                       class="contact-item {% if contact.username == contact_username %}active{% endif %}">
+                        <div class="contact-name">{{ contact.username }}</div>
+                        <div class="contact-hash">Hash: {{ contact.profile.user_hash|truncatechars:10 }}</div>
+                    </a>
                 {% endfor %}
-            {% endif %}
-
-            <div class="messages-area" id="messages">
-                {% for message in messages %}
-                    <div class="message {% if message.sender == user.username %}own{% else %}other{% endif %}">
-                        <div class="sender">{{ message.sender }}</div>
-                        <div class="content">{{ message.content }}</div>
-                        <div class="timestamp">{{ message.timestamp|date:"M d, Y H:i" }}</div>
-                    </div>
-                {% empty %}
-                    <div class="empty-messages">
-                        <p>👋 No messages yet. Start the conversation by sending your first secret message!</p>
-                    </div>
-                {% endfor %}
-            </div>
-
-            <form method="post" class="message-form">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="id_content">Your Secret Message</label>
-                    <textarea name="content" id="id_content" placeholder="Type your encrypted message here..." required maxlength="1000" rows="3"></textarea>
+            {% else %}
+                <div class="no-contacts">
+                    <p>👤 No contacts yet</p>
+                    <p>Send a message to start a conversation!</p>
                 </div>
-                <button type="submit" class="send-btn">🚀 Send Message</button>
-            </form>
+            {% endif %}
+        </div>
 
-            <form method="post" action="{% url 'clear_messages' %}" style="text-align: center;">
-                {% csrf_token %}
-                <button type="submit" class="clear-btn">🗑️ Clear All Messages</button>
-            </form>
+        <!-- Main Chat Area -->
+        <div class="main-chat">
+            {% if contact %}
+                <!-- Back to contacts button -->
+                <a href="{% url 'chat' %}" class="back-to-contacts">← Contacts</a>
+
+                <!-- Chat Header -->
+                <div class="chat-header">
+                    💬 Chatting with <strong>{{ contact.username }}</strong>
+                    <span style="font-size: 0.8em; opacity: 0.7; margin-left: 10px;">
+                        Hash: {{ contact.profile.user_hash|truncatechars:12 }}
+                    </span>
+                </div>
+
+                <div class="welcome-message">
+                    <div class="greeting">🔒 Private Conversation</div>
+                    <div class="subtitle">Messages between you and {{ contact.username }}</div>
+                </div>
+
+                <div class="security-notice">
+                    <strong>🔒 P2P Security Note:</strong> Messages are encrypted with sender/receiver hashes.
+                    Sender: {{ user.profile.user_hash|truncatechars:12 }} |
+                    Receiver: {{ contact.profile.user_hash|truncatechars:12 }}
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}success{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- Messages Area -->
+                <div class="messages-area" id="messages">
+                    {% for message in messages %}
+                        <div class="message {% if message.sender == user.username %}own{% else %}other{% endif %}">
+                            <div class="sender">{{ message.sender }}</div>
+                            <div class="content">{{ message.content }}</div>
+                            <div class="timestamp">{{ message.timestamp|date:"M d, Y H:i" }}</div>
+                        </div>
+                    {% empty %}
+                        <div class="empty-messages">
+                            <p>💬 No messages in this conversation yet.</p>
+                            <p>Be the first to send a secret message!</p>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Message Form -->
+                <form method="post" class="message-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="receiver" value="{{ contact.username }}">
+                    <div class="form-group">
+                        <label for="id_content">Your Secret Message to {{ contact.username }}</label>
+                        <textarea name="content" id="id_content" placeholder="Type your encrypted message here..." required maxlength="1000" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="send-btn">🚀 Send to {{ contact.username }}</button>
+                </form>
+
+            {% else %}
+                <!-- Contact List View -->
+                <div class="chat-header">
+                    📋 Select a Contact
+                </div>
+
+                <div class="welcome-message">
+                    <div class="greeting">👥 {{"Welcome to P2P Messenger"|title}}</div>
+                    <div class="subtitle">Select a contact from the sidebar to start chatting</div>
+                </div>
+
+                <div class="messages-area" style="text-align: center; display: flex; align-items: center; justify-content: center;">
+                    <div style="color: #8696a0;">
+                        <div style="font-size: 3em; margin-bottom: 20px;">💬</div>
+                        <p>Choose a contact from the sidebar to start a private conversation</p>
+                        <p style="margin-top: 10px; font-size: 0.9em;">
+                            Messages are encrypted with unique user hashes for security
+                        </p>
+                    </div>
+                </div>
+
+                <div class="security-notice" style="text-align: center; margin-top: 20px;">
+                    <strong>🔐 How P2P Works:</strong><br>
+                    Each user gets a unique hash on signup. Messages include sender and receiver hashes for secure encryption.
+                    Conversations are private between two users only.
+                </div>
+            {% endif %}
         </div>
     </div>
 
