@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Messenger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+            border-radius: 4px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .message .sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .message .content {
+            background-color: #e8f5e8;
+            padding: 8px;
+            border-radius: 3px;
+            word-wrap: break-word;
+        }
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"], textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 40px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .clear-btn {
+            background-color: #dc3545;
+        }
+        .clear-btn:hover {
+            background-color: #c82333;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .placeholder-info {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border: 1px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secret Messenger</h1>
+
+        <div class="placeholder-info">
+            <strong>Note:</strong> Encoding and decoding functions are placeholders.
+            Implement your own security functions in <code>views.py</code> encode_message() and decode_message() functions.
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-success">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="messages" id="messages">
+            {% for message in messages %}
+                <div class="message">
+                    <div class="sender">{{ message.sender }}</div>
+                    <div class="content">{{ message.content }}</div>
+                    <div class="timestamp">{{ message.timestamp|date:"M d, Y H:i" }}</div>
+                </div>
+            {% empty %}
+                <p style="color: #666; text-align: center; margin-top: 50px;">No messages yet. Start the conversation!</p>
+            {% endfor %}
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="text" name="sender" placeholder="Your name (optional)" maxlength="100">
+            <textarea name="content" placeholder="Type your secret message..." required maxlength="1000"></textarea>
+            <button type="submit">Send Message</button>
+        </form>
+
+        <form method="post" action="{% url 'clear_messages' %}">
+            {% csrf_token %}
+            <button type="submit" class="clear-btn">Clear All Messages</button>
+        </form>
+    </div>
+</body>
+</html>
