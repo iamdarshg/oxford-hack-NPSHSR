@@ -812,15 +812,16 @@
                 <!-- Start Conversation Form -->
                 <div class="start-conversation-card">
                     <div class="start-conversation-title">📧 Enter Recipient's Email</div>
-                    <form method="get" class="start-conversation-form">
+                    <form method="post" class="start-conversation-form">
+                        {% csrf_token %}
                         <div class="form-group">
-                            <label for="id_email">Recipient's Email Address</label>
-                            <input type="email" name="email" id="id_email"
+                            <label for="id_receiver_email">Recipient's Email Address</label>
+                            <input type="email" name="receiver_email" id="id_receiver_email"
                                    class="email-input"
                                    placeholder="Enter email address (e.g., user@example.com)"
                                    required>
                         </div>
-                        <button type="submit" class="start-btn">🚀 Start Chat</button>
+                        <button type="submit" class="start-btn">🚀 Add Contact</button>
                     </form>
                 </div>
 

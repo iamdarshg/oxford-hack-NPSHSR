@@ -64,21 +64,34 @@ def chat_view(request, contact_email=None):
         content = request.POST.get('content', '').strip()
         receiver_email = request.POST.get('receiver_email', '').strip()
 
-        if content and receiver_email:
-            # Find receiver by email or username
-            receiver_user = User.objects.filter(email=receiver_email).first()
-            if not receiver_user:
-                # Fallback to username if no email match
-                receiver_user = User.objects.filter(username=receiver_email).first()
+        if not receiver_email:
+            messages.error(request, "Please enter the recipient's email address.")
+            return redirect('chat')
 
-            if not receiver_user:
-                messages.error(request, f"User with email '{receiver_email}' not found.")
-                return redirect('chat')
+        # Find receiver by email or username
+        receiver_user = User.objects.filter(email=receiver_email).first()
+        if not receiver_user:
+            # Fallback to username if no email match
+            receiver_user = User.objects.filter(username=receiver_email).first()
 
-            if receiver_user == request.user:
-                messages.error(request, "You cannot send messages to yourself.")
-                return redirect('chat')
+        if not receiver_user:
+            messages.error(request, f"User with email '{receiver_email}' not found.")
+            return redirect('chat')
 
+        if receiver_user == request.user:
+            messages.error(request, "You cannot add yourself as a contact.")
+            return redirect('chat')
+
+        # Ensure explicit Contact records exist for both directions
+        try:
+            Contact.objects.get_or_create(user=request.user, contact=receiver_user)
+            Contact.objects.get_or_create(user=receiver_user, contact=request.user)
+        except Exception:
+            # If contact creation fails, still proceed
+            logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
+
+        # If there's also content, send a message
+        if content:
             # Get or create user profile for current user
             sender_profile, created = UserProfile.objects.get_or_create(user=request.user)
 
@@ -97,23 +110,12 @@ def chat_view(request, contact_email=None):
                 content=encoded_content
             )
 
-            # Ensure explicit Contact records exist for both directions
-            try:
-                Contact.objects.get_or_create(user=request.user, contact=receiver_user)
-                Contact.objects.get_or_create(user=receiver_user, contact=request.user)
-            except Exception:
-                # If contact creation fails, don't block sending the message
-                logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
-
             messages.success(request, f"Message sent to {receiver_user.email or receiver_user.username}!")
+        else:
+            messages.success(request, f"Contact {receiver_user.email or receiver_user.username} added successfully!")
 
-            # Redirect to the conversation
-            return redirect('chat_with_user', contact_email=receiver_user.email or receiver_user.username)
-
-        elif not content:
-            messages.error(request, "Please enter a message.")
-        elif not receiver_email:
-            messages.error(request, "Please enter the recipient's email address.")
+        # Redirect to the conversation
+        return redirect('chat_with_user', contact_email=receiver_user.email or receiver_user.username)
 
     # Prefer explicit Contact relations (new, reliable method)
     try:
