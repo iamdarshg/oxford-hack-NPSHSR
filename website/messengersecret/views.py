@@ -4,9 +4,14 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
-from .models import Message, UserProfile
+from .models import Message, UserProfile, Contact
+from django.db.models import Q
+from django.db.utils import OperationalError
 import datetime
 from .encoding import encoding, decoding
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Placeholder encode and decode functions - user to implement
 def encode_message(message, sender_hash, receiver_hash):
@@ -84,13 +89,22 @@ def chat_view(request, contact_email=None):
             encoded_content = encode_message(content, sender_profile.user_hash, receiver_profile.user_hash)
 
             # Create P2P message with hashes
-            Message.objects.create(
+            msg = Message.objects.create(
                 sender=request.user.username,
                 receiver=receiver_user.username,
                 sender_hash=sender_profile.user_hash,
                 receiver_hash=receiver_profile.user_hash,
                 content=encoded_content
             )
+
+            # Ensure explicit Contact records exist for both directions
+            try:
+                Contact.objects.get_or_create(user=request.user, contact=receiver_user)
+                Contact.objects.get_or_create(user=receiver_user, contact=request.user)
+            except Exception:
+                # If contact creation fails, don't block sending the message
+                logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
+
             messages.success(request, f"Message sent to {receiver_user.email or receiver_user.username}!")
 
             # Redirect to the conversation
@@ -101,24 +115,28 @@ def chat_view(request, contact_email=None):
         elif not receiver_email:
             messages.error(request, "Please enter the recipient's email address.")
 
-    # Get user's contacts (users they've messaged with) - for privacy
-    sent_messages = Message.objects.filter(sender=request.user.username).values_list('receiver', flat=True).distinct()
-    received_messages = Message.objects.filter(receiver=request.user.username).values_list('sender', flat=True).distinct()
-    contact_usernames = set(sent_messages) | set(received_messages)
-    contact_usernames.discard(request.user.username)  # Remove self
+    # Prefer explicit Contact relations (new, reliable method)
+    try:
+        contact_user_qs = Contact.objects.filter(user=request.user).values_list('contact_id', flat=True)
+        contacts = list(User.objects.filter(id__in=contact_user_qs))
+    except OperationalError:
+        # The Contact table may not exist yet (migrations not applied).
+        # Fall back to deriving contacts from Message records so the app stays usable
+        contacts = []
 
-    # Get contact objects
-    contacts = []
-    for username in contact_usernames:
-        user = User.objects.filter(username=username).first()
-        if user:
-            contacts.append(user)
+    # Backwards-compatible fallback: derive contacts from Message records if no explicit contacts
+    if not contacts:
+        sent_usernames = Message.objects.filter(sender=request.user.username).values_list('receiver', flat=True)
+        received_usernames = Message.objects.filter(receiver=request.user.username).values_list('sender', flat=True)
+        contact_usernames = set(sent_usernames) | set(received_usernames)
+        contact_usernames.discard(request.user.username)
+        contacts = list(User.objects.filter(username__in=contact_usernames))
 
     # Get messages for P2P conversation
     if contact:
         conversation_messages = Message.objects.filter(
-            ((Message.sender == request.user.username) & (Message.receiver == contact.username)) |
-            ((Message.sender == contact.username) & (Message.receiver == request.user.username))
+            (Q(sender=request.user.username) & Q(receiver=contact.username)) |
+            (Q(sender=contact.username) & Q(receiver=request.user.username))
         ).order_by('timestamp')
 
         decoded_messages = []

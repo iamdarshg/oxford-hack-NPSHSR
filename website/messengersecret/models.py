@@ -28,3 +28,20 @@ class Message(models.Model):
     def __str__(self):
         recipient = f" -> {self.receiver}" if self.receiver else " (room)"
         return f"{self.sender}{recipient}: {self.content[:50]}"
+
+
+class Contact(models.Model):
+    """Explicit contact relation between two users.
+
+    Storing contacts explicitly avoids relying on string fields in Message
+    and makes queries simpler and more reliable.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacts')
+    contact = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contact_of')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (('user', 'contact'),)
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.contact.username}"
