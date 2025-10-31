@@ -2,7 +2,10 @@ import requests
 import numpy as np
 from PIL import Image
 import io
-import lzma
+import subprocess
+import tempfile
+import os
+import time
 import random
 
 class ImageSteganography:
@@ -13,6 +16,99 @@ class ImageSteganography:
             "https://api.thecatapi.com/v1/images/search",
             "https://placekitten.com/800/600"
         ]
+        self.rangenc_exe = os.path.join(os.path.dirname(__file__), '..', '..', 'test', 'rangenc.exe')
+
+    def _compress_with_range_encoding(self, data: bytes) -> bytes:
+        """Compress data using C++ range encoding executable"""
+        start_time = time.time()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.in') as input_file:
+            input_file.write(data)
+            input_path = input_file.name
+
+        output_path = input_path + '.compressed'
+
+        try:
+            # Run range encoding compression
+            result = subprocess.run(
+                [self.rangenc_exe, 'encode', input_path, output_path],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Range encoding failed: {result.stderr}")
+
+            # Read compressed data
+            with open(output_path, 'rb') as f:
+                compressed_data = f.read()
+
+            compression_time = time.time() - start_time
+            original_size = len(data)
+            compressed_size = len(compressed_data)
+            ratio = compressed_size / original_size if original_size > 0 else 0
+
+            print(f"Range encoding: {original_size} -> {compressed_size} bytes ({ratio:.2%}, {compression_time:.4f}s)")
+
+            return compressed_data
+
+        except FileNotFoundError:
+            print("rangenc.exe not found, falling back to no compression")
+            return data
+        finally:
+            # Clean up temp files
+            for path in [input_path, output_path]:
+                try:
+                    os.unlink(path)
+                except:
+                    pass
+
+    def _decompress_with_range_encoding(self, compressed_data: bytes) -> bytes:
+        """Decompress data using C++ range encoding executable"""
+        start_time = time.time()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.compressed') as input_file:
+            input_file.write(compressed_data)
+            input_path = input_file.name
+
+        output_path = input_path + '.decompressed'
+
+        try:
+            # Run range encoding decompression
+            result = subprocess.run(
+                [self.rangenc_exe, 'decode', input_path, output_path],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                raise RuntimeError(f"Range decoding failed: {result.stderr}")
+
+            # Read decompressed data
+            with open(output_path, 'rb') as f:
+                decompressed_data = f.read()
+
+            decompression_time = time.time() - start_time
+            compressed_size = len(compressed_data)
+            decompressed_size = len(decompressed_data)
+            ratio = decompressed_size / compressed_size if compressed_size > 0 else 0
+
+            print(f"Range decoding: {compressed_size} -> {decompressed_size} bytes ({ratio:.2%}, {decompression_time:.4f}s)")
+
+            return decompressed_data
+
+        except FileNotFoundError:
+            print("rangenc.exe not found, treating data as uncompressed")
+            return compressed_data
+        finally:
+            # Clean up temp files
+            for path in [input_path, output_path]:
+                try:
+                    os.unlink(path)
+                except:
+                    pass
 
     def _get_random_cat_image(self):
         """Fetch a random cat image from the internet"""
@@ -53,14 +149,14 @@ class ImageSteganography:
         # Save to bytes and compress
         img_byte_arr = io.BytesIO()
         encoded_image.save(img_byte_arr, format='PNG')
-        compressed_data = lzma.compress(img_byte_arr.getvalue())
-        
+        compressed_data = self._compress_with_range_encoding(img_byte_arr.getvalue())
+
         return compressed_data
 
     def decode_message(self, compressed_data: bytes) -> str:
         """Decode a message from a compressed steganographic image"""
         # Decompress the image
-        img_data = lzma.decompress(compressed_data)
+        img_data = self._decompress_with_range_encoding(compressed_data)
         image = Image.open(io.BytesIO(img_data))
         
         # Convert to numpy array
@@ -84,3 +180,26 @@ class ImageSteganography:
 
 encoding = ImageSteganography().encode_message
 decoding = ImageSteganography().decode_message
+
+if __name__ == "__main__":
+    # Example usage
+    import time as timing
+    sender_hash = "a1b2c3d4e5f60718293a4b5c6d7e8f90abcdef1234567890abcdef1234567890"
+    receiver_hash = "0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba0987654321fedcba0987654321"
+    message = "Hello, this is a secret message hidden in a cat image!"
+
+    print(f"Original message length: {len(message)} chars")
+
+    start_time = timing.time()
+    encoded_data = encoding(message, sender_hash, receiver_hash)
+    encoding_time = timing.time() - start_time
+    print(f"Encoded data size: {len(encoded_data)} bytes")
+    print(f"Encoding time: {encoding_time:.4f}s")
+
+    start_time = timing.time()
+    decoded_message = decoding(encoded_data, sender_hash, receiver_hash)
+    decoding_time = timing.time() - start_time
+    print(f"Decoded message: {decoded_message}")
+    print(f"Decoding time: {decoding_time:.4f}s")
+
+    print(f"Round-trip success: {message == decoded_message}")
