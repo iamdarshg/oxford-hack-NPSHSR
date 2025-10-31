@@ -115,7 +115,7 @@ def chat_view(request, contact_email=None):
             messages.success(request, f"Contact {receiver_user.email or receiver_user.username} added successfully!")
 
         # Redirect to the conversation
-        return redirect('chat_with_user', contact_email=receiver_user.email or receiver_user.username)
+        return redirect('chat_with_user', contact_email=receiver_user.username)
 
     # Prefer explicit Contact relations (new, reliable method)
     try:
