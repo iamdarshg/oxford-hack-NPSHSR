@@ -1,8 +1,8 @@
-lfrom django.shortcuts import render, redirect
+from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from .models import Message
 import datetime
 
@@ -65,6 +65,33 @@ def clear_messages(request):
         messages.success(request, "All messages cleared!")
     return redirect('chat')
 
+def landing_view(request):
+    """Landing page for non-authenticated users"""
+    if request.user.is_authenticated:
+        return redirect('chat')
+    return render(request, 'messengersecret/landing.html')
+
+def signup_view(request):
+    """Handle user registration"""
+    if request.user.is_authenticated:
+        return redirect('chat')
+
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)  # Auto-login after registration
+            messages.success(request, f"Welcome to Secret Messenger, {user.username}!")
+            return redirect('chat')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.title()}: {error}")
+    else:
+        form = UserCreationForm()
+
+    return render(request, 'messengersecret/signup.html', {'form': form})
+
 def login_view(request):
     """Handle user login"""
     if request.method == 'POST':
@@ -90,4 +117,4 @@ def logout_view(request):
     """Handle user logout"""
     logout(request)
     messages.info(request, "You have been logged out.")
-    return redirect('login')
+    return redirect('landing')

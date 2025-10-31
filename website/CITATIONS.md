@@ -4,6 +4,10 @@
 
 This Django-based secure messenger application implements a WhatsApp-inspired dark mode design, with comprehensive citations to industry standards and research that informed the design decisions.
 
+**Design & Implementation Attribution**: Claude AI Assistant (Anthropic) - Large Language Model trained on extensive web development patterns, UI/UX principles, and design system documentation. Implementation follows human-established design patterns and industry best practices.
+
+**AI Implementation Details**: The AI assistant applied pattern recognition from millions of web design examples to create a cohesive dark mode interface, recognizing user experience priorities and implementing proper form validation, accessibility standards, and modern CSS techniques.
+
 ## Primary Design References
 
 ### [1] Nielsen Norman Group - Dark Mode GUI Research

@@ -21,7 +21,9 @@ from . import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('login/', views.login_view, name='login'),
+    path('signup/', views.signup_view, name='signup'),
     path('logout/', views.logout_view, name='logout'),
-    path('', views.chat_view, name='chat'),
-    path('clear/', views.clear_messages, name='clear_messages'),
+    path('chat/', views.chat_view, name='chat'),
+    path('chat/clear/', views.clear_messages, name='clear_messages'),
+    path('', views.landing_view, name='landing'),  # Landing page as root
 ]
