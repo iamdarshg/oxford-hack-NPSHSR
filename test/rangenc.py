@@ -135,27 +135,61 @@ class RangeDecoder:
         return symbol
 
 
-def build_cumulative_freqs():
-    # Uniform frequency for bytes 0-255
-    freqs = [1] * 256
+def build_cumulative_freqs(freqs):
+    # Build cumulative frequencies from actual frequency counts
     cum_freqs = [0]
     for f in freqs:
         cum_freqs.append(cum_freqs[-1] + f)
     return cum_freqs
 
-
-def encode_file(input_path, output_path):
-    cum_freqs = build_cumulative_freqs()
-    total = cum_freqs[-1]
-
-    encoder = RangeEncoder()
+def count_frequencies(input_path):
+    # Count actual byte frequencies in the input file
+    freqs = [0] * 256
     with open(input_path, 'rb') as f:
         while True:
             byte = f.read(1)
             if not byte:
                 break
+            freqs[byte[0]] += 1
+    return freqs
+
+
+def encode_file(input_path, output_path):
+    # First pass: count frequencies for data compression
+    freqs = count_frequencies(input_path)
+    cum_freqs = build_cumulative_freqs(freqs)
+    total = cum_freqs[-1]
+
+    # Get file length for header
+    with open(input_path, 'rb') as f:
+        f.seek(0, 2)  # Seek to end
+        file_len = f.tell()
+        f.seek(0)  # Back to start
+
+    encoder = RangeEncoder()
+
+    # Create a simple encoder for header (use uniform frequencies since we don't know header distribution)
+    uniform_freqs = [1] * 256
+    uniform_cum_freqs = build_cumulative_freqs(uniform_freqs)
+    uniform_total = uniform_cum_freqs[-1]
+
+    # Write file length as header (4 bytes) using uniform frequencies
+    for i in range(4):
+        byte = (file_len >> (i * 8)) & 0xFF
+        encoder.encode_symbol(byte, uniform_cum_freqs[byte], uniform_freqs[byte], uniform_total)
+
+    # Write frequency information (256 * 4 bytes = 1024 bytes header)
+    for freq in freqs:
+        for j in range(4):
+            byte = (freq >> (j * 8)) & 0xFF
+            encoder.encode_symbol(byte, uniform_cum_freqs[byte], uniform_freqs[byte], uniform_total)
+
+    # Encode actual data using the actual frequencies
+    with open(input_path, 'rb') as f:
+        for _ in range(file_len):
+            byte = f.read(1)
             symbol = byte[0]
-            encoder.encode_symbol(symbol, cum_freqs[symbol], 1, total)
+            encoder.encode_symbol(symbol, cum_freqs[symbol], freqs[symbol], total)
 
     compressed = encoder.finish()
     with open(output_path, 'wb') as f:
@@ -163,19 +197,60 @@ def encode_file(input_path, output_path):
 
 
 def decode_file(input_path, output_path):
-    cum_freqs = build_cumulative_freqs()
     with open(input_path, 'rb') as f:
         compressed = f.read()
+
+    # Use uniform frequencies for decoding header
+    uniform_freqs = [1] * 256
+    uniform_cum_freqs = build_cumulative_freqs(uniform_freqs)
+    uniform_total = uniform_cum_freqs[-1]
+
     decoder = RangeDecoder(compressed)
 
+    # Read file length from header (first 4 bytes)
+    file_length = 0
+    for i in range(4):
+        byte = decoder.decode_symbol(uniform_cum_freqs)
+        file_length |= byte << (i * 8)
+
+    # Read frequency information (next 1024 bytes: 256 frequencies * 4 bytes each)
+    freqs = []
+    for _ in range(256):
+        freq = 0
+        for j in range(4):
+            byte = decoder.decode_symbol(uniform_cum_freqs)
+            freq |= byte << (j * 8)
+        freqs.append(freq)
+
+    cum_freqs = build_cumulative_freqs(freqs)
+    total = cum_freqs[-1]
+
     with open(output_path, 'wb') as f:
-        # Decode until end of file condition (simplified by fixed length)
-        # In real use, you'd encode original file length or EOF symbol
-        for _ in range(1024 * 1024):  # decode up to 1MB for example
+        for _ in range(file_length):
             symbol = decoder.decode_symbol(cum_freqs)
             f.write(bytes([symbol]))
 
 
 # Example usage:
-encode_file('test.png', 'compressed.bin')
-decode_file('compressed.bin', 'out.png')
+encode_file('test/test.dng', 'test/compressed.bin')
+decode_file('test/compressed.bin', 'test/out.dng')
+
+from PIL import Image, ImageChops
+
+def images_are_equal(path1, path2):
+    img1 = Image.open(path1)
+    img2 = Image.open(path2)
+
+    # Check if sizes are the same
+    if img1.size != img2.size:
+        return False
+
+    # Use ImageChops.difference to get pixel difference
+    diff = ImageChops.difference(img1, img2)
+
+    # If images are the same, diff.getbbox() returns None
+    return diff.getbbox() is None
+
+# Example usage
+result = images_are_equal('out.dng', 'test.dng')
+print("Images are the same:" if result else "Images differ")

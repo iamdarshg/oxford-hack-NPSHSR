@@ -97,6 +97,6 @@ The implementation follows established UI/UX patterns from the cited sources:
 ---
 
 *Design Implementation Date: October 31, 2025*
-*AI Assistant: Claude (Anthropic)*
+*AI Assistant: grok-code-fast-1 via Cline*
 *Framework: Django Web Framework*
 *Styling: Pure CSS with mobile-first responsive design*

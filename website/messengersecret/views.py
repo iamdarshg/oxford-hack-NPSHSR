@@ -6,21 +6,28 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 from .models import Message, UserProfile
 import datetime
+from .encoding import encoding, decoding
 
 # Placeholder encode and decode functions - user to implement
-def encode_message(message):
+def encode_message(message, sender_hash, receiver_hash):
     """
-    Placeholder for message encoding function.
-    Implement your encoding logic here (e.g., encryption, base64, etc.)
+    Message encoding function that uses sender and receiver hashes.
+    Takes the message and both user hashes into account for encoding.
     """
-    return message  # Currently returns unchanged
+    # Use both hashes to create a unique encoding context
+    encoded_message=encoding(message, sender_hash, receiver_hash)
+    
+    return encoded_message
 
-def decode_message(message):
+def decode_message(message, sender_hash, receiver_hash):
     """
-    Placeholder for message decoding function.
-    Implement your decoding logic here (matches the encoding above)
+    Message decoding function that uses sender and receiver hashes.
+    Takes the encoded message and both user hashes to decode.
     """
-    return message  # Currently returns unchanged
+    # Use both hashes in the same way as encoding
+    decoded_message=decoding(message, sender_hash, receiver_hash)
+    
+    return decoded_message
 
 @login_required
 def chat_view(request, contact_email=None):
@@ -73,8 +80,8 @@ def chat_view(request, contact_email=None):
             # Get or create user profile for receiver
             receiver_profile, created = UserProfile.objects.get_or_create(user=receiver_user)
 
-            # Encode the message
-            encoded_content = encode_message(content)
+            # Encode the message with both user hashes
+            encoded_content = encode_message(content, sender_profile.user_hash, receiver_profile.user_hash)
 
             # Create P2P message with hashes
             Message.objects.create(
@@ -120,7 +127,7 @@ def chat_view(request, contact_email=None):
                 'id': msg.id,
                 'sender': msg.sender,
                 'receiver': msg.receiver,
-                'content': decode_message(msg.content),
+                'content': decode_message(msg.content, msg.sender_hash, msg.receiver_hash),
                 'timestamp': msg.timestamp,
                 'sender_hash': msg.sender_hash,
                 'receiver_hash': msg.receiver_hash
