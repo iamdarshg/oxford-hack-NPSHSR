@@ -794,6 +794,12 @@
                     <div class="form-group">
                         <label for="id_content">Your Secret Message to {{ contact.username }}</label>
                         <textarea name="content" id="id_content" placeholder="Type your encrypted message here..." required maxlength="1000" rows="3"></textarea>
+                        <div style="margin-top: 8px;">
+                            <label style="font-size: 0.85em; color: #e9edef;">
+                                <input type="checkbox" name="bypass_encryption" id="id_bypass_encryption" style="margin-right: 8px;">
+                                🔓 Bypass encryption (send plain text)
+                            </label>
+                        </div>
                     </div>
                     <button type="submit" class="send-btn">🚀 Send to {{ contact.username }}</button>
                 </form>

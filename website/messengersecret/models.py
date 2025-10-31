@@ -23,11 +23,12 @@ class Message(models.Model):
     sender_hash = models.CharField(max_length=64, null=True, blank=True)
     receiver_hash = models.CharField(max_length=64, null=True, blank=True)
     content = models.TextField()
+    is_encrypted = models.BooleanField(default=True)  # Track if message is encrypted
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         recipient = f" -> {self.receiver}" if self.receiver else " (room)"
-        return f"{self.sender}{recipient}: {self.content[:50]}"
+r        return f"{self.sender}{recipient}: {self.content[:50]}"
 
 
 class Contact(models.Model):

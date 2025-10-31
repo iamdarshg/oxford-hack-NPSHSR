@@ -10,6 +10,8 @@ from django.db.utils import OperationalError
 import datetime
 from .encoding import encoding, decoding
 import logging
+import base64
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -63,59 +65,105 @@ def chat_view(request, contact_email=None):
     if request.method == 'POST':
         content = request.POST.get('content', '').strip()
         receiver_email = request.POST.get('receiver_email', '').strip()
+        receiver = request.POST.get('receiver', '').strip()
 
-        if not receiver_email:
-            messages.error(request, "Please enter the recipient's email address.")
-            return redirect('chat')
+        # Determine if this is message send (from contact chat) or contact add (from start conversation)
+        if content and receiver:
+            # Message send from contact chat
+            receiver_username = receiver
+            receiver_user = User.objects.filter(username=receiver_username).first()
 
-        # Find receiver by email or username
-        receiver_user = User.objects.filter(email=receiver_email).first()
-        if not receiver_user:
-            # Fallback to username if no email match
-            receiver_user = User.objects.filter(username=receiver_email).first()
+            if not receiver_user:
+                messages.error(request, f"User '{receiver_username}' not found.")
+                return redirect('chat')
 
-        if not receiver_user:
-            messages.error(request, f"User with email '{receiver_email}' not found.")
-            return redirect('chat')
+            if receiver_user == request.user:
+                messages.error(request, "You cannot send messages to yourself.")
+                return redirect('chat')
 
-        if receiver_user == request.user:
-            messages.error(request, "You cannot add yourself as a contact.")
-            return redirect('chat')
-
-        # Ensure explicit Contact records exist for both directions
-        try:
-            Contact.objects.get_or_create(user=request.user, contact=receiver_user)
-            Contact.objects.get_or_create(user=receiver_user, contact=request.user)
-        except Exception:
-            # If contact creation fails, still proceed
-            logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
-
-        # If there's also content, send a message
-        if content:
             # Get or create user profile for current user
             sender_profile, created = UserProfile.objects.get_or_create(user=request.user)
 
             # Get or create user profile for receiver
             receiver_profile, created = UserProfile.objects.get_or_create(user=receiver_user)
 
-            # Encode the message with both user hashes
-            encoded_content = encode_message(content, sender_profile.user_hash, receiver_profile.user_hash)
+            # Ensure explicit Contact records exist for both directions
+            try:
+                Contact.objects.get_or_create(user=request.user, contact=receiver_user)
+                Contact.objects.get_or_create(user=receiver_user, contact=request.user)
+            except Exception:
+                # If contact creation fails, still proceed
+                logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
 
-            # Create P2P message with hashes
+            # Create message immediately with plain text
             msg = Message.objects.create(
                 sender=request.user.username,
                 receiver=receiver_user.username,
                 sender_hash=sender_profile.user_hash,
                 receiver_hash=receiver_profile.user_hash,
-                content=encoded_content
+                content=content,  # Plain text initially
+                is_encrypted=False  # Will be updated by background thread
             )
 
-            messages.success(request, f"Message sent to {receiver_user.email or receiver_user.username}!")
-        else:
-            messages.success(request, f"Contact {receiver_user.email or receiver_user.username} added successfully!")
+            # Check for encryption bypass
+            bypass_encryption = request.POST.get('bypass_encryption') == 'on'
+            if not bypass_encryption:
+                # Start background thread for complex encryption
+                def encrypt_message_background(message_id, plain_text, sender_hash, receiver_hash):
+                    try:
+                        encoded_bytes = encode_message(plain_text, sender_hash, receiver_hash)
+                        encrypted_content = base64.b64encode(encoded_bytes).decode('ascii')
+                        # Update the message with encrypted content
+                        Message.objects.filter(id=message_id).update(
+                            content=encrypted_content,
+                            is_encrypted=True
+                        )
+                        logger.info(f"Background encryption completed for message {message_id}")
+                    except Exception as e:
+                        logger.error(f"Background encryption failed for message {message_id}: {e}")
 
-        # Redirect to the conversation
-        return redirect('chat_with_user', contact_email=receiver_user.username)
+                # Start encryption thread
+                encryption_thread = threading.Thread(
+                    target=encrypt_message_background,
+                    args=(msg.id, content, sender_profile.user_hash, receiver_profile.user_hash)
+                )
+                encryption_thread.daemon = True  # Don't keep app alive if main thread dies
+                encryption_thread.start()
+
+            messages.success(request, f"Message sent to {receiver_user.username}!")
+            return redirect('chat_with_user', contact_email=receiver_user.username)
+
+        elif receiver_email:
+            # Contact add from start conversation form
+            # Find receiver by email or username
+            receiver_user = User.objects.filter(email=receiver_email).first()
+            if not receiver_user:
+                # Fallback to username if no email match
+                receiver_user = User.objects.filter(username=receiver_email).first()
+
+            if not receiver_user:
+                messages.error(request, f"User '{receiver_email}' not found.")
+                return redirect('chat')
+
+            if receiver_user == request.user:
+                messages.error(request, "You cannot add yourself as a contact.")
+                return redirect('chat')
+
+            # Ensure explicit Contact records exist for both directions
+            try:
+                Contact.objects.get_or_create(user=request.user, contact=receiver_user)
+                Contact.objects.get_or_create(user=receiver_user, contact=request.user)
+            except Exception:
+                # If contact creation fails, still proceed
+                logger.exception('Failed to create Contact rows for %s <-> %s', request.user.username, receiver_user.username)
+
+            messages.success(request, f"Contact {receiver_user.username} added successfully!")
+            # Redirect to the conversation
+            return redirect('chat_with_user', contact_email=receiver_user.username)
+
+        else:
+            messages.error(request, "Invalid request.")
+            return redirect('chat')
 
     # Prefer explicit Contact relations (new, reliable method)
     try:
@@ -143,11 +191,22 @@ def chat_view(request, contact_email=None):
 
         decoded_messages = []
         for msg in conversation_messages:
+            if msg.is_encrypted:
+                try:
+                    # Decode base64 to bytes first, then decode the encrypted content
+                    encrypted_bytes = base64.b64decode(msg.content.encode('ascii'))
+                    decoded_content = decode_message(encrypted_bytes, msg.sender_hash, msg.receiver_hash)
+                except Exception as e:
+                    # If decoding fails, show error message
+                    decoded_content = f"[Encryption decoding failed: {str(e)}]"
+                    logger.exception(f"Failed to decode encrypted message: {e}")
+            else:
+                decoded_content = msg.content
             decoded_messages.append({
                 'id': msg.id,
                 'sender': msg.sender,
                 'receiver': msg.receiver,
-                'content': decode_message(msg.content, msg.sender_hash, msg.receiver_hash),
+                'content': decoded_content,
                 'timestamp': msg.timestamp,
                 'sender_hash': msg.sender_hash,
                 'receiver_hash': msg.receiver_hash
