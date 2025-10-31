@@ -565,7 +565,93 @@
             background: #128c7e;
         }
 
+        /* Modal Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background: #1f2937;
+            margin: 15% auto;
+            padding: 30px;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #e9edef;
+            margin-bottom: 5px;
+        }
+
+        .modal-body {
+            color: #e9edef;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            text-align: center;
+            margin-top: 25px;
+        }
+
+        .modal-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .error-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
         @media (max-width: 768px) {
+            .modal-content {
+                margin: 20% auto;
+                padding: 25px;
+                width: 95%;
+            }
+
             .header {
                 padding: 10px 15px;
                 flex-direction: column;
@@ -676,13 +762,14 @@
                     Receiver: {{ contact.profile.user_hash|truncatechars:12 }}
                 </div>
 
-                {% if messages %}
-                    {% for message in messages %}
+                <!-- Success Messages (non-modal) -->
+                {% for message in messages %}
+                    {% if message.tags != 'error' %}
                         <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}success{% endif %}">
                             {{ message }}
                         </div>
-                    {% endfor %}
-                {% endif %}
+                    {% endif %}
+                {% endfor %}
 
                 <!-- Messages Area -->
                 <div class="messages-area" id="messages">
@@ -761,13 +848,92 @@
         </div>
     </div>
 
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="error-icon">❌</div>
+                <h2 class="modal-title">Invalid Recipient</h2>
+            </div>
+            <div class="modal-body" id="errorMessage">
+                <!-- Error message will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Auto-scroll to bottom of messages
         const messagesArea = document.getElementById('messages');
-        messagesArea.scrollTop = messagesArea.scrollHeight;
+        if (messagesArea) {
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
 
         // Focus on textarea when page loads
-        document.getElementById('id_content').focus();
+        const contentTextarea = document.getElementById('id_content');
+        if (contentTextarea) {
+            contentTextarea.focus();
+        }
+
+        // Modal management functions
+        function showModal(message) {
+            const modal = document.getElementById('errorModal');
+            const errorMessage = document.getElementById('errorMessage');
+            if (errorMessage) {
+                errorMessage.textContent = message;
+            }
+            if (modal) {
+                modal.style.display = 'block';
+                modal.focus();
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('errorModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('errorModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Check for error messages on page load and show modal
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create a temporary div to hold Django messages for processing
+            const djangoMessages = `
+                {% for message in messages %}
+                    {% if message.tags == 'error' %}
+                        <div class="django-message" data-message="{{ message|escapejs }}" data-tags="{{ message.tags }}"></div>
+                    {% endif %}
+                {% endfor %}
+            `;
+
+            // Insert temporary container
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = djangoMessages;
+            tempDiv.style.display = 'none';
+            document.body.appendChild(tempDiv);
+
+            // Find and process error messages
+            const errorMessages = tempDiv.querySelectorAll('.django-message[data-tags="error"]');
+            if (errorMessages.length > 0) {
+                const message = errorMessages[0].getAttribute('data-message');
+                if (message) {
+                    showModal(message);
+                }
+            }
+
+            // Remove temporary container
+            document.body.removeChild(tempDiv);
+        });
     </script>
 </body>
 </html>

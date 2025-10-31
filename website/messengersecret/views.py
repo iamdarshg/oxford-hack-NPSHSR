@@ -30,7 +30,7 @@ def chat_view(request, contact_email=None):
     if request.method == 'GET' and 'email' in request.GET:
         email_param = request.GET.get('email', '').strip()
         if email_param:
-            return redirect('chat_with_user', email=email_param)
+            return redirect('chat_with_user', contact_email=email_param)
 
     contact = None
     if contact_email:
@@ -87,7 +87,7 @@ def chat_view(request, contact_email=None):
             messages.success(request, f"Message sent to {receiver_user.email or receiver_user.username}!")
 
             # Redirect to the conversation
-            return redirect('chat_with_user', email=receiver_user.email or receiver_user.username)
+            return redirect('chat_with_user', contact_email=receiver_user.email or receiver_user.username)
 
         elif not content:
             messages.error(request, "Please enter a message.")

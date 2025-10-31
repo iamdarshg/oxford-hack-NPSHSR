@@ -177,5 +177,5 @@ def decode_file(input_path, output_path):
 
 
 # Example usage:
-# encode_file('input.bin', 'compressed.bin')
-# decode_file('compressed.bin', 'recovered.bin')
+encode_file('test.png', 'compressed.bin')
+decode_file('compressed.bin', 'out.png')

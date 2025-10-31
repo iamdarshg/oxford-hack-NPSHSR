@@ -24,7 +24,7 @@ urlpatterns = [
     path('signup/', views.signup_view, name='signup'),
     path('logout/', views.logout_view, name='logout'),
     path('chat/', views.chat_view, name='chat'),  # Contact list with email input
-    path('chat/<str:email>/', views.chat_view, name='chat_with_user'),  # P2P chat
+    path('chat/<str:contact_email>/', views.chat_view, name='chat_with_user'),  # P2P chat
     path('chat/clear/', views.clear_messages, name='clear_messages'),
     path('', views.landing_view, name='landing'),  # Landing page as root
 ]
