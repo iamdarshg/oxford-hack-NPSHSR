@@ -393,7 +393,7 @@
             margin: 0 auto;
         }
 
-        .contacts-sidebar {
+        .conversations-sidebar {
             width: 300px;
             background: #1f2937;
             border-radius: 12px;
@@ -402,7 +402,7 @@
             height: fit-content;
         }
 
-        .contacts-title {
+        .conversations-title {
             font-size: 1.2em;
             font-weight: 600;
             margin-bottom: 15px;
@@ -411,7 +411,7 @@
             padding-bottom: 10px;
         }
 
-        .contact-item {
+        .conversation-item {
             display: block;
             padding: 12px;
             margin-bottom: 8px;
@@ -422,12 +422,12 @@
             transition: all 0.2s ease;
         }
 
-        .contact-item:hover {
+        .conversation-item:hover {
             background: #4b5563;
             transform: translateY(-1px);
         }
 
-        .contact-item.active {
+        .conversation-item.active {
             background: #25d366;
             color: white;
         }
@@ -440,13 +440,95 @@
         .contact-hash {
             font-size: 0.8em;
             opacity: 0.7;
+            margin-bottom: 4px;
         }
 
-        .no-contacts {
+        .contact-email {
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+
+        .no-conversations {
             text-align: center;
             color: #8696a0;
             font-style: italic;
-            padding: 40px 20px;
+            padding: 0 20px;
+        }
+
+        /* Start conversation form */
+        .start-conversation-card {
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .start-conversation-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #e9edef;
+            border-bottom: 1px solid #374151;
+            padding-bottom: 10px;
+        }
+
+        .start-conversation-form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #e9edef;
+            font-weight: 500;
+            font-size: 0.85em;
+        }
+
+        .email-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            background: #303030;
+            color: #e9edef;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.95em;
+            transition: border-color 0.2s ease;
+        }
+
+        .email-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .email-input:focus {
+            outline: none;
+            border-color: #25d366;
+            box-shadow: 0 0 0 2px rgba(37, 211, 102, 0.2);
+        }
+
+        .start-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #25d366;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .start-btn:hover {
+            background: #128c7e;
+            transform: translateY(-1px);
         }
 
         .main-chat {
@@ -546,22 +628,25 @@
     </header>
 
     <div class="p2p-layout">
-        <!-- Contacts Sidebar -->
-        <div class="contacts-sidebar">
-            <div class="contacts-title">📱 Your Contacts</div>
+        <!-- Conversations Sidebar -->
+        <div class="conversations-sidebar">
+            <div class="conversations-title">💬 Your Conversations</div>
 
             {% if contacts %}
                 {% for contact in contacts %}
-                    <a href="{% url 'chat_with_user' contact.username %}"
-                       class="contact-item {% if contact.username == contact_username %}active{% endif %}">
+                    <a href="{% url 'chat_with_user' contact.email|default:contact.username %}"
+                       class="conversation-item {% if contact.email == contact_email or contact.username == contact_email %}active{% endif %}">
                         <div class="contact-name">{{ contact.username }}</div>
                         <div class="contact-hash">Hash: {{ contact.profile.user_hash|truncatechars:10 }}</div>
+                        {% if contact.email %}
+                            <div class="contact-email">{{ contact.email }}</div>
+                        {% endif %}
                     </a>
                 {% endfor %}
             {% else %}
-                <div class="no-contacts">
-                    <p>👤 No contacts yet</p>
-                    <p>Send a message to start a conversation!</p>
+                <div class="no-conversations">
+                    <p>👤 No conversations yet</p>
+                    <p>Enter an email address below to start a new chat!</p>
                 </div>
             {% endif %}
         </div>
@@ -627,20 +712,40 @@
                 </form>
 
             {% else %}
-                <!-- Contact List View -->
+                <!-- Start New Conversation View -->
                 <div class="chat-header">
-                    📋 Select a Contact
+                    📋 Start a New Conversation
                 </div>
 
                 <div class="welcome-message">
-                    <div class="greeting">👥 {{"Welcome to P2P Messenger"|title}}</div>
-                    <div class="subtitle">Select a contact from the sidebar to start chatting</div>
+                    <div class="greeting">👥 {{"P2P Messenger"|title}}</div>
+                    <div class="subtitle">Enter an email address to start a private conversation</div>
                 </div>
 
+                <!-- Start Conversation Form -->
+                <div class="start-conversation-card">
+                    <div class="start-conversation-title">📧 Enter Recipient's Email</div>
+                    <form method="get" class="start-conversation-form">
+                        <div class="form-group">
+                            <label for="id_email">Recipient's Email Address</label>
+                            <input type="email" name="email" id="id_email"
+                                   class="email-input"
+                                   placeholder="Enter email address (e.g., user@example.com)"
+                                   required>
+                        </div>
+                        <button type="submit" class="start-btn">🚀 Start Chat</button>
+                    </form>
+                </div>
+
+                <!-- Recent Activity Placeholder -->
                 <div class="messages-area" style="text-align: center; display: flex; align-items: center; justify-content: center;">
                     <div style="color: #8696a0;">
                         <div style="font-size: 3em; margin-bottom: 20px;">💬</div>
-                        <p>Choose a contact from the sidebar to start a private conversation</p>
+                        {% if contacts %}
+                            <p>Select a conversation from the sidebar or start a new one above</p>
+                        {% else %}
+                            <p>Enter an email address above to start your first private conversation!</p>
+                        {% endif %}
                         <p style="margin-top: 10px; font-size: 0.9em;">
                             Messages are encrypted with unique user hashes for security
                         </p>
@@ -649,8 +754,8 @@
 
                 <div class="security-notice" style="text-align: center; margin-top: 20px;">
                     <strong>🔐 How P2P Works:</strong><br>
-                    Each user gets a unique hash on signup. Messages include sender and receiver hashes for secure encryption.
-                    Conversations are private between two users only.
+                    Enter the recipient's email address to start chatting. Only you and your conversation partner can read your messages.
+                    Each user gets a unique hash on signup for enhanced security.
                 </div>
             {% endif %}
         </div>

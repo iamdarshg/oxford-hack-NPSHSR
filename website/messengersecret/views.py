@@ -25,6 +25,13 @@ def decode_message(message):
 @login_required
 def chat_view(request, contact_email=None):
     """P2P chat view - show conversation with specific contact or contact list"""
+
+    # Handle GET requests with email parameter (from the start conversation form)
+    if request.method == 'GET' and 'email' in request.GET:
+        email_param = request.GET.get('email', '').strip()
+        if email_param:
+            return redirect('chat_with_user', email=email_param)
+
     contact = None
     if contact_email:
         # Try to find user by email or username for backward compatibility
