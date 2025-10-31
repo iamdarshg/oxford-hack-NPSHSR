@@ -152,6 +152,7 @@ The evolution demonstrates modern web development practices including:
 **Release Date**: October 31, 2025
 **Lead Developer**: Aryan & Darsh
 **Lead Agent**: Groke-Code-Fast-1 via Cline
+**Lead Agent**: Claude Sonnet 3.5
 **Architecture**: Django Web Framework
 **Design System**: WhatsApp Dark Mode Theme
 **Citation Practice**: Industry-standard academic/technical references
